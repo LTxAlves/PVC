@@ -33,4 +33,4 @@ Estas instruções vão ensinar a como
 * [SDL2](https://wiki.libsdl.org/)
 ## Desenvolvedores
 
-** Leonardo Alves
+* Leonardo Alves

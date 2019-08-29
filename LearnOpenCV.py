@@ -9,8 +9,8 @@ from math import sqrt
 master = tk.Tk()
 
 def quit_event():
-    master.quit()
     master.destroy()
+    master.quit()
 
 master.protocol("WM_DELETE_WINDOW", quit_event)
 
@@ -59,7 +59,9 @@ button = tk.Radiobutton(master, text="Grayscale Video", variable=choice, command
 button.pack(anchor=tk.W)
 button = tk.Radiobutton(master, text="Color Video", variable=choice, command=lambda *args: callback("RGBVid"))
 button.pack(anchor=tk.W)
-button = tk.Radiobutton(master, text="Webcam Video", variable=choice, command=lambda *args: callback("CamVid"))
+button = tk.Radiobutton(master, text="Grayscale Webcam Video", variable=choice, command=lambda *args: callback("BWCam"))
+button.pack(anchor=tk.W)
+button = tk.Radiobutton(master, text="Color Webcam Video", variable=choice, command=lambda *args: callback("RGBCam"))
 button.pack(anchor=tk.W)
 button.wait_variable(choice)
 
@@ -122,6 +124,28 @@ elif file_chosen is not None:
             if frame_counter == vid.get(cv2.CAP_PROP_FRAME_COUNT):
                 frame_counter = 0
                 vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            if (cv2.waitKey(25) & 0xFF == ord('q')) or (cv2.getWindowProperty('Video', 0) < 0):
+                break
+    vid.release()
+    cv2.destroyAllWindows()
+    exit()
+
+else:
+    vid = cv2.VideoCapture(0)
+    print("Press 'q' to quit!")
+    while(vid.isOpened()):
+        ret, img = vid.read()
+        if ret:
+            if not colored:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            cv2.imshow('Video', img)
+            cv2.setMouseCallback('Video', ClickEvent, param)
+
+            if colored and param:
+                coloredImageClick(img, param[0], param[1], param[2])
+            elif param:
+                grayscaleImageClick(img, param[0])
+
             if (cv2.waitKey(25) & 0xFF == ord('q')) or (cv2.getWindowProperty('Video', 0) < 0):
                 break
     vid.release()
