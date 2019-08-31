@@ -27,7 +27,7 @@ python3 LearnOpenCV.py
 ```
 
 em seguida, seguir as janelas de escolha de tipo de uso (arquivos de imagem ou vídeo ou webcam, coloridos ou em tom de cinza).
-Ao escolher um arquivo ou abrir a webcam, basta clicar em um ponto da imagem para selecionar um pixel ou apertar a tecla <kbd>Q</kbd>./ para sair
+Ao escolher um arquivo ou abrir a webcam, basta clicar em um ponto da imagem para selecionar um pixel ou apertar a tecla <kbd>Q</kbd> para sair
 
 ## Feito com
 
