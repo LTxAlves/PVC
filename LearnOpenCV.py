@@ -68,7 +68,7 @@ button.wait_variable(choice)
 isImg = True
 
 if "Img" in choice:
-    file_chosen = fd.askopenfilename(title="Choose a file", filetypes=[('image', ('.jpg', '.jpeg', '.png'))])
+    file_chosen = fd.askopenfilename(title="Choose a file", filetypes=[('image', ('.jpg', '.jpeg'))])
 elif "Vid" in choice:
     file_chosen = fd.askopenfilename(title="Choose a file", filetypes=[('video', ('.avi', '.264'))])
     isImg = False
@@ -138,6 +138,7 @@ else:
         if ret:
             if not colored:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.resize(img, (640, 360), interpolation=cv2.INTER_AREA)
             cv2.imshow('Video', img)
             cv2.setMouseCallback('Video', ClickEvent, param)
 
