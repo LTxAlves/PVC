@@ -18,6 +18,7 @@ Estas instruções vão mostrar os requisitos básicos para utilização do prog
 * Python3 (elaborado em versão 3.7.4. Não testado para versões inferiores)
 * OpenCV (versão 3.4 ou superior)
 * Tkinter (elaborado em versão 8.6. Não testado para versões inferiores)
+* NumPy (elaborado em versão 1.17.0. Não testado para versões inferiores)
 
 ## Usando o programa
 
@@ -34,7 +35,7 @@ Ao escolher um arquivo ou abrir a webcam, basta clicar em um ponto da imagem par
 * [Python3](https://www.python.org/)
 * [OpenCV](https://opencv.org/)
 * [Tkinter](https://docs.python.org/3/library/tk.html)
-
+* [NumPy](https://numpy.org/)
 
 ## Desenvolvedor
 
