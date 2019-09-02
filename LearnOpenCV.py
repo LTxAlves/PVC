@@ -8,44 +8,44 @@ from math import sqrt
 
 master = tk.Tk()
 
-def quit_event():
+def quit_event(): #closing the Tkinter window event
     master.destroy()
     master.quit()
 
 master.protocol("WM_DELETE_WINDOW", quit_event)
 
-choice = tk.StringVar()
-choice.set("BWImg")
+choice = tk.StringVar() #defining variabe
+choice.set("BWImg") #initializing it
 
-def callback(value):
+def callback(value): #callback for tkinter button click
     global choice
     choice = value
 
-def coloredImageClick(img, b, g, r):
-    aux = img
-    value_clicked = np.array([b, g, r])
-    aux = np.square(np.subtract(aux.astype('int32'), value_clicked.astype('int32')))
-    aux = np.sqrt(np.sum(aux, axis=2, keepdims=True)) < 13
-    newimg = (np.where(aux, (0, 0, 255), img)).astype(img.dtype)
-    cv2.imshow('New Image', newimg)
+def coloredImageClick(img, b, g, r): #function to handle colored image rgb value detection
+    aux = img #copies img
+    value_clicked = np.array([b, g, r]) #creates array from clicked rgb values
+    aux = np.square(np.subtract(aux.astype('int32'), value_clicked.astype('int32'))) #square of each difference: Bi - Bc, Gi - Gc, Ri - Rc
+    aux = np.sqrt(np.sum(aux, axis=2, keepdims=True)) < 13 #square root of sum of squares made into array of bools accordint to requirement (< 13)
+    newimg = (np.where(aux, (0, 0, 255), img)).astype(img.dtype) #fills according pixels with red
+    cv2.imshow('New Image', newimg) #shows copy of img with red values
 
-def grayscaleImageClick(img, px):
-    bools = (np.absolute(img.astype('int32') - px) < 13).reshape((img.shape[0], img.shape[1], 1))
-    newimg = (np.reshape(img,(img.shape[0], img.shape[1], 1))).repeat(3, axis=2)
-    newimg = (np.where(bools, (0, 0, 255), newimg)).astype(img.dtype)
-    cv2.imshow('New Image', newimg)
+def grayscaleImageClick(img, px): #function to handle grayscale pixel intensity detection
+    bools = (np.absolute(img.astype('int32') - px) < 13).reshape((img.shape[0], img.shape[1], 1)) #checks if absolute value of difference of pixels is < 13
+    newimg = (np.reshape(img,(img.shape[0], img.shape[1], 1))).repeat(3, axis=2) #reshapes and copies so image can be colored (fill with red)
+    newimg = (np.where(bools, (0, 0, 255), newimg)).astype(img.dtype) #fills according pixels with red
+    cv2.imshow('New Image', newimg) #shows copy of img with red values
 
-def ClickEvent(event, x, y, flags, param):
-    if event == cv2.EVENT_LBUTTONDOWN:
-        print('Coordinates:\tx (column) = ' + str(x) + '\ty (row) = ' + str(y))
-        if colored:
+def ClickEvent(event, x, y, flags, param): #callback event for mouse events
+    if event == cv2.EVENT_LBUTTONDOWN: #left click on image/video
+        print('Coordinates:\tx (column) = ' + str(x) + '\ty (row) = ' + str(y)) #prints coordinates of click
+        if colored: #routine for colored images/videos
             param.clear()
             param.append(img[y, x][0])
             param.append(img[y, x][1])
             param.append(img[y, x][2])
             print('Color values:\tR = ' + str(param[2]) + ',\tG = ' + str(param[1]) +  ',\tB = ' + str(param[0]))
             coloredImageClick(img, param[0], param[1], param[2])
-        else:
+        else: #routine for graysacle images/videos
             param.clear()
             param.append(img[y, x])
             print("Pixel intensity: " + str(param[0]))
@@ -63,11 +63,11 @@ button = tk.Radiobutton(master, text="Grayscale Webcam Video", variable=choice, 
 button.pack(anchor=tk.W)
 button = tk.Radiobutton(master, text="Color Webcam Video", variable=choice, command=lambda *args: callback("RGBCam"))
 button.pack(anchor=tk.W)
-button.wait_variable(choice)
+button.wait_variable(choice) #buttons for user selection
 
-isImg = True
+isImg = True #initializing variable to check if is image
 
-if "Img" in choice:
+if "Img" in choice: #tests to check type of usage
     file_chosen = fd.askopenfilename(title="Choose a file", filetypes=[('image', ('.jpg', '.jpeg'))])
 elif "Vid" in choice:
     file_chosen = fd.askopenfilename(title="Choose a file", filetypes=[('video', ('.avi', '.264'))])
@@ -76,16 +76,16 @@ else:
     file_chosen = None
     isImg = False
 
-flag = cv2.IMREAD_COLOR
-colored = True
+flag = cv2.IMREAD_COLOR #initializing flag for colored images
+colored = True #initializing variable to check if colored or not
 
-param = []
+param = [] #initializing empty array for mouse callback event
 
-if "BW" in choice:
+if "BW" in choice: #tests if grayscale instead of colored
     colored = False
     flag = cv2.IMREAD_GRAYSCALE
 
-if isImg:
+if isImg: #image routine
     img = cv2.imread(file_chosen, flag)
     if img is None:
         print("Error opening image")
@@ -103,7 +103,7 @@ if isImg:
     cv2.destroyAllWindows()
     exit()
 
-elif file_chosen is not None:
+elif file_chosen is not None: #video file routine
     vid = cv2.VideoCapture(file_chosen)
     frame_counter = 0
     print("Press 'q' to quit!")
@@ -130,7 +130,7 @@ elif file_chosen is not None:
     cv2.destroyAllWindows()
     exit()
 
-else:
+else: #webcam video routine
     vid = cv2.VideoCapture(0)
     print("Press 'q' to quit!")
     while(vid.isOpened()):
