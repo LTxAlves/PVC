@@ -6,6 +6,8 @@ from datetime import datetime
 from pandas import DataFrame
 from os.path import exists
 from os import remove
+import xml.etree.ElementTree as ET
+from statistics import stdev
 
 def ClickEvent(event, x, y, flags, param): #callback event for mouse events
     if event == cv2.EVENT_LBUTTONDOWN: #left click on image/video
@@ -38,7 +40,7 @@ def to_xml(df, filename=None, mode='a+'):
     def row_to_xml(row):
         xml = ['\t\t<row>']
         for i, col_name in enumerate(row.index):
-            xml.append('\t\t<{0}>{1}</{0}>'.format(col_name, row.iloc[i]))
+            xml.append('\t\t\t<value name=\"{0}\">{1}</value>'.format(col_name, row.iloc[i]))
         xml.append('\t\t</row>\n')
         return '\n'.join(xml)
     res += '\n'.join(df.apply(row_to_xml, axis=1))
@@ -52,6 +54,23 @@ def to_xml(df, filename=None, mode='a+'):
         return res
     with open(filename, mode) as f:
         f.write(res)
+
+def avg_mtx(filename=None, src='cal'):
+    root = ET.parse(filename).getroot()
+    data = []
+    for val in root.iter('value'):
+        data.append(float(val.text))
+
+    data = np.array(data)
+    if src == 'cal':
+        data = np.reshape(data, (repeats, 3, 3))
+    elif src == 'dist':
+        data = np.reshape(data, (repeats, 5))
+
+    avg = np.average(data, axis=0)
+    std_dev = np.std(data, axis=0, ddof=1)
+
+    return avg, std_dev
 
 rawClicks = [] #coordinates of clicks on raw image
 udClicks = [] #coordinates of clicks on undistorted images
@@ -183,7 +202,7 @@ imagem sem distorcao
 
         img = cv2.flip(img, 1)
         
-        #remapeamento
+        # remapping
         dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
 
         if len(rawClicks) == 1:
@@ -198,7 +217,7 @@ imagem sem distorcao
             cv2.line(dst, udClicks[0], udClicks[1], color=(0, 255, 0), thickness=2) #shows line
         cv2.imshow('undistorted', dst)
 
-        #Aperte a tecla 'q' para encerrar o programa
+        # press 'q' to quit
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
             break
@@ -218,7 +237,7 @@ if __name__ == "__main__":
     WebCam = cv2.VideoCapture(0)
 
     # number of images to be used in calculating intrinsic parameters
-    max_images = 3
+    max_images = 5
 
     # number of intersections between 4 spaces on
     # chessboard pattern (horizontally and vertically)
@@ -232,8 +251,18 @@ if __name__ == "__main__":
     time_step = 2
 
     # number of calibrations for averaging the matrix
-    repeats = 2
+    repeats = 5
 
     for iterator in range(repeats):
         mtx, dist = calibration(WebCam, square_size, board_h, board_w, time_step, max_images)
         correct_distortion(WebCam, mtx, dist)
+
+    avrg_mtx, std_dev = avg_mtx('calibrationMatrix.xml')
+    avrg_dist, dist_dev = avg_mtx('distortionMatrix.xml', src='dist')
+
+    print('Average intrinsic parameters matrix:\n{}'.format(avrg_mtx))
+    print('Intrinsic parameters standard deviation:\n{}'.format(std_dev))
+    print('Average distortion parameters:\n{}'.format(avrg_dist))
+    print('Distotion parameters standard deviation:\n{}'.format(dist_dev))
+
+    correct_distortion(WebCam, avrg_mtx, avrg_dist)
