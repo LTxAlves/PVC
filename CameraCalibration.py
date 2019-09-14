@@ -22,10 +22,10 @@ def ClickEvent(event, x, y, flags, param): #callback event for mouse events
             param.append((x, y))
 
 '''
-Rotina a seguir adaptada a partir da disponível em:
+Following method adapted from the available on:
 https://stackoverflow.com/questions/18574108/how-do-convert-a-pandas-dataframe-to-xml
-Autor: Andy Hayden - 2 de setembro de 2013
-Recebe dataframe do módulo pandas, cria campos a partir de cada linha do dataframe e salva no arquivo
+Author: Andy Hayden - 2nd of september 2013
+From a Pandas dataframe, creats fields from each line in it and saves them as a .xml file
 '''
 
 def to_xml(df, filename=None, mode='a+'):
@@ -62,10 +62,12 @@ def avg_mtx(filename=None, src='cal'):
         data.append(float(val.text))
 
     data = np.array(data)
-    if src == 'cal':
+    if src == 'cal' or src == 'rot':
         data = np.reshape(data, (repeats, 3, 3))
     elif src == 'dist':
         data = np.reshape(data, (repeats, 5))
+    elif src == 'trans':
+        data = np.reshape(data, (repeats, 3))
 
     avg = np.average(data, axis=0)
     std_dev = np.std(data, axis=0, ddof=1)
@@ -76,27 +78,29 @@ rawClicks = [] #coordinates of clicks on raw image
 udClicks = [] #coordinates of clicks on undistorted images
 
 '''
-Código a seguir baseado no disponível na plataforma Aprender
+Following code based upon the available on Aprender/Moodle
 (https://aprender.ead.unb.br/mod/resource/view.php?id=282863).
-Adaptado conforme interesses do Projeto.
+Adapted according to project's goals
 '''
 
 def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
     '''
-    Metodo para calibrar a camera, utiliza o padrao de calibracao forncido (pattern.pdf) para 
-calcular a matriz dos parametros intrinsecos da camera e os parametros de distorcao da mesma
+    Method for calibrating the camera using a chessboard pattern;
+    calibrates while finding intrinsic parameters, distortion, rotational and translational matrices
 
-    Parametros:
-        -WebCam: Objeto do openCV que abriu a webcam do computador
-        -square_size: Tamanho (mm) do quadrado no padrao impresso
-        -board_h: Quantidade de intersecoes entre 4 quadrados na vertical 
-        -board_w: Quantidade de intersecoes entre 4 quadrados na horizontal 
-        -time_step: Tempo (s) de espera entre deteccoes para poder movimentar o padrao 
-        -max_images: Numero total de fotos tiradas do padrao para fazer a calibracao
+    Parameters:
+        -WebCam: OpenCV object referencing camera
+        -square_size: length (mm) of side of a single square on chessboard pattern
+        -board_h: number of intersections between 4 squares counted vertically
+        -board_w: number of intersections between 4 squares counted vertically
+        -time_step: time (s) to wait between chessboard detection (allows to move patter to new position) 
+        -max_images: number of snapshots to be taken of the chessboard pattern
 
-    Retorno:
-        -mtx: matriz dos parametros intrinsecos da camera calculados na calibracao
-        -dist: parametros de distorcao da camera calculados na calibracao
+    Returns:
+        -mtx: 3x3 intrinsic parameters matrix
+        -dist: 1x5 distortion matrix
+        -rmtx: 3x3 rotational matrix (average between max_images snapshots)
+        -tvecs: 1x3 translational vector (average between max_images snapshots)
     '''
     # stop criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, square_size, 0.001)
@@ -123,6 +127,8 @@ calcular a matriz dos parametros intrinsecos da camera e os parametros de distor
         if not grab or img is None:
             break
 
+        img = cv2.flip(img, 1)
+
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
         cv2.imshow('Webcam', img)
@@ -142,10 +148,15 @@ calcular a matriz dos parametros intrinsecos da camera e os parametros de distor
             img = cv2.drawChessboardCorners(img, (board_w,board_h), corners2,ret)
             cv2.imshow('Corners Detected',img)
 
+
+            k = cv2.waitKey(1) & 0xFF
+            if k == ord('s'):
+                cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', img)
+
             # resests star_time after finding pattern (time_step condition)
             start_time = time()
 
-        # pressing q to close program
+        # press 'q' to close program
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
             break
@@ -154,31 +165,46 @@ calcular a matriz dos parametros intrinsecos da camera e os parametros de distor
     cv2.destroyAllWindows()
 
     # calibrates camera according to parameters found
-    ret, mtx, dist, _, _ = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
+    _, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
+    
+    rvecs = np.array(rvecs)
+    rmtx = np.zeros((3,3))
+
+    for vector in rvecs:
+        aux, _ = cv2.Rodrigues(vector)
+        rmtx += aux
+
+    rmtx /= max_images
+    
+    tvecs = np.array(tvecs).mean(axis=0).reshape((1, 3))
 
     print('Intrinsic parameters matrix:\n{}'.format(mtx))
     print('Distortion parameters:\n{}'.format(dist))
+    print('Rotational matrix\n{}'.format(rmtx))
+    print('Translational matrix\n{}'.format(tvecs.transpose()))
 
     mtx_df = DataFrame({'Column1' : mtx[:, 0], 'Column2' : mtx[:, 1], 'Column3' : mtx[:, 2]})
     to_xml(mtx_df, filename='calibrationMatrix.xml')
     dist_df = DataFrame({'K1' : dist[:, 0], 'K2' : dist[:, 1], 'P1' : dist[:, 2], 'P2' : dist[:, 3], 'K3' : dist[:, 4]})
     to_xml(dist_df, filename='distortionMatrix.xml')
+    rmtx_df = DataFrame({'Column1': rmtx[:, 0], 'Column2' : rmtx[:, 1], 'Column3' : rmtx[:, 2]})
+    to_xml(rmtx_df, filename='rotationMatrix.xml')
+    tvec_df = DataFrame({'tx': tvecs[:, 0], 'ty' : tvecs[:, 1], 'tz' : tvecs[:, 2]})
+    to_xml(tvec_df, filename='translationMatrix.xml')
 
-
-    return mtx, dist
+    return mtx, dist, rmtx, tvecs
 
 def correct_distortion(WebCam, mtx, dist):
     '''
-    Metodo para corrigir a distorcao na imagem da webcam e mostrar na tela a imagem original da camera e a 
-imagem sem distorcao
+    Method to correct camera (webcam) distortion while showing the original and the corrected feeds
 
-    Parametros:
-        -WebCam: Objeto do openCV que abriu a webcam do computador
-        -mtx: matriz dos parametros intrinsecos da camera calculados na calibracao
-        -dist: parametros de distorcao da camera calculados na calibracao
+    Parameters:
+        -WebCam: OpenCV object referencing camera
+        -mtx: intrinsic parameters matrix found for said camera
+        -dist: distortion parameters found for said camera
     '''
 
-    #Inicializa as janelas raw e undistorted
+    # initialize 'raw' (no correction) and 'undistorted' (corrected) windows
     cv2.namedWindow('raw')
     cv2.namedWindow('undistorted')
     cv2.setMouseCallback('raw', ClickEvent, param=rawClicks)
@@ -188,7 +214,7 @@ imagem sem distorcao
     h,  w = img.shape[:2]
     newcameramtx, _ = cv2.getOptimalNewCameraMatrix(mtx,dist,(w,h),1,(w,h))
     
-    # Mapeamento para retirar a distorcao da imagem
+    # mapping to remove camera distortion
     mapx, mapy = cv2.initUndistortRectifyMap(mtx,dist,None,newcameramtx,(w,h),5)
     
     print('Press \'q\' to quit/repeat calibration')
@@ -221,12 +247,10 @@ imagem sem distorcao
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
             break
-
-        elif k == ord('r'):
-            cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', img)
-
-        elif k == ord('u'):
-            cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', dst)
+        elif k == ord('r'): # press 'r' to save raw
+            cv2.imwrite('raw_capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', img)
+        elif k == ord('u'): # press 'u' to save undistorted
+            cv2.imwrite('ud_capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', dst)
 
     cv2.destroyAllWindows()
     udClicks.clear()
@@ -254,15 +278,24 @@ if __name__ == "__main__":
     repeats = 5
 
     for iterator in range(repeats):
-        mtx, dist = calibration(WebCam, square_size, board_h, board_w, time_step, max_images)
+        mtx, dist, rmtx, tvecs = calibration(WebCam, square_size, board_h, board_w, time_step, max_images)
         correct_distortion(WebCam, mtx, dist)
 
     avrg_mtx, std_dev = avg_mtx('calibrationMatrix.xml')
     avrg_dist, dist_dev = avg_mtx('distortionMatrix.xml', src='dist')
+    avrg_rot, rot_dev = avg_mtx('rotationMatrix.xml', src='rot')
+    avrg_trans, trans_dev = avg_mtx('translationMatrix.xml', src='trans')
+
+    avrg_trans = avrg_trans.reshape((3, 1))
+    trans_dev = trans_dev.reshape((3, 1))
 
     print('Average intrinsic parameters matrix:\n{}'.format(avrg_mtx))
     print('Intrinsic parameters standard deviation:\n{}'.format(std_dev))
     print('Average distortion parameters:\n{}'.format(avrg_dist))
-    print('Distotion parameters standard deviation:\n{}'.format(dist_dev))
+    print('Distortion parameters standard deviation:\n{}'.format(dist_dev))
+    print('Average rotation matrix:\n{}'.format(avrg_rot))
+    print('Rotation matrix standard deviation:\n{}'.format(rot_dev))
+    print('Average translation matrix:\n{}'.format(avrg_trans))
+    print('Translation matrix standard deviation:\n{}'.format(trans_dev))
 
     correct_distortion(WebCam, avrg_mtx, avrg_dist)
