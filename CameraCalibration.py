@@ -1,21 +1,35 @@
 import cv2
 import numpy as np
-from math import sqrt
 from time import time
 from datetime import datetime
 from pandas import DataFrame
 from os.path import exists
 from os import remove
 import xml.etree.ElementTree as ET
-from statistics import stdev
+
+IMAGE_SIZE = (640, 360)
+
+def PixelsToReal(x1, y1, x2, y2):
+    inv_intrinsics = np.linalg.inv(avrg_mtx)
+    inv_extrinsics = np.linalg.pinv(np.concatenate([avrg_rot, avrg_trans], axis=1))
+    point1, point2 = np.array([x1, x2, 1]), np.array([x2, y2, 1])
+    mapping1 = np.matmul(inv_extrinsics, np.matmul(inv_intrinsics, point1))
+    mapping1 /= mapping1[-1]
+    mapping2 = np.matmul(inv_extrinsics, np.matmul(inv_intrinsics, point2))
+    mapping2 /= mapping2[-1]
+    return np.sqrt((mapping2[0]-mapping1[0])**2 + (mapping2[1] - mapping1[1])**2) # assuming z2 = z1 = 0, distance = ((x2-x1)^2 + (y2-y1)^2)^0.5
 
 def ClickEvent(event, x, y, flags, param): #callback event for mouse events
     if event == cv2.EVENT_LBUTTONDOWN: #left click on image/video
 
         param.append((x, y)) # appends coordinates to array
         if len(param) == 2: #calculates distance of 2 pairs of coordinates on array
-            size = sqrt((param[0][0] - param[1][0])**2 + (param[0][1] - param[1][1])**2)
+            size = np.sqrt((param[0][0] - param[1][0])**2 + (param[0][1] - param[1][1])**2)
             print('Line length = %.5f'%(size), 'pixels')
+
+            if finished:
+                distance = PixelsToReal(param[0][0], param[0][1], param[1][0], param[0][1])
+                print('Real distance = %.5f'%(distance))
 
         if len(param) == 3: # every third click counts as a 1st click
             param.clear()
@@ -109,6 +123,9 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
     objp = np.zeros((board_h*board_w,3), dtype='float32')
     objp[:,:2] = np.mgrid[0:board_w,0:board_h].T.reshape(-1,2)
 
+    # map units in mm since we have square_size
+    objp *= square_size
+
     # Arrays to store object points and image points from all the images.
     objpoints = [] # 3D point in real world space
     imgpoints = [] # 2D points in image plane.
@@ -128,24 +145,25 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
             break
 
         img = cv2.flip(img, 1)
+        img = cv2.resize(img, IMAGE_SIZE, interpolation=cv2.INTER_AREA)
 
-        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         cv2.imshow('Webcam', img)
 
         # finds chessboard patter corners on image
-        ret, corners = cv2.findChessboardCorners(gray, (board_w,board_h),None)
+        ret, corners = cv2.findChessboardCorners(gray, (board_w,board_h), None)
 
         # If found, add object points, image points (after refining them)
         if ret == True and elapsed > time_step:
             detected_images += 1
             objpoints.append(objp)
 
-            corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+            corners2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
             imgpoints.append(corners2)
 
             # shows user chessboard corners found
-            img = cv2.drawChessboardCorners(img, (board_w,board_h), corners2,ret)
+            img = cv2.drawChessboardCorners(img, (board_w,board_h), corners2, ret)
             cv2.imshow('Corners Detected',img)
 
 
@@ -211,6 +229,8 @@ def correct_distortion(WebCam, mtx, dist):
     cv2.setMouseCallback('undistorted', ClickEvent, param=udClicks)
 
     grab, img = WebCam.read()
+    img = cv2.flip(img, 1)
+    img = cv2.resize(img, IMAGE_SIZE, interpolation=cv2.INTER_AREA)
     h,  w = img.shape[:2]
     newcameramtx, _ = cv2.getOptimalNewCameraMatrix(mtx,dist,(w,h),1,(w,h))
     
@@ -227,6 +247,7 @@ def correct_distortion(WebCam, mtx, dist):
             break
 
         img = cv2.flip(img, 1)
+        img = cv2.resize(img, IMAGE_SIZE, interpolation=cv2.INTER_AREA)
         
         # remapping
         dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
@@ -265,8 +286,8 @@ if __name__ == "__main__":
 
     # number of intersections between 4 spaces on
     # chessboard pattern (horizontally and vertically)
-    board_w = 8
-    board_h = 6
+    board_w = 6
+    board_h = 8
 
     # size of each space on chessboard pattern (mm)
     square_size = 28
@@ -277,9 +298,13 @@ if __name__ == "__main__":
     # number of calibrations for averaging the matrix
     repeats = 5
 
+    finished = False
+
     for iterator in range(repeats):
         mtx, dist, rmtx, tvecs = calibration(WebCam, square_size, board_h, board_w, time_step, max_images)
         correct_distortion(WebCam, mtx, dist)
+    
+    finished = True
 
     avrg_mtx, std_dev = avg_mtx('calibrationMatrix.xml')
     avrg_dist, dist_dev = avg_mtx('distortionMatrix.xml', src='dist')
@@ -289,13 +314,15 @@ if __name__ == "__main__":
     avrg_trans = avrg_trans.reshape((3, 1))
     trans_dev = trans_dev.reshape((3, 1))
 
-    print('Average intrinsic parameters matrix:\n{}'.format(avrg_mtx))
-    print('Intrinsic parameters standard deviation:\n{}'.format(std_dev))
-    print('Average distortion parameters:\n{}'.format(avrg_dist))
-    print('Distortion parameters standard deviation:\n{}'.format(dist_dev))
-    print('Average rotation matrix:\n{}'.format(avrg_rot))
-    print('Rotation matrix standard deviation:\n{}'.format(rot_dev))
-    print('Average translation matrix:\n{}'.format(avrg_trans))
-    print('Translation matrix standard deviation:\n{}'.format(trans_dev))
+    print('Average intrinsic parameters matrix:\n{}\n\n'.format(avrg_mtx))
+    print('Intrinsic parameters standard deviation:\n{}\n\n'.format(std_dev))
+    print('Average distortion parameters:\n{}\n\n'.format(avrg_dist))
+    print('Distortion parameters standard deviation:\n{}\n\n'.format(dist_dev))
+    print('Average rotation matrix:\n{}\n\n'.format(avrg_rot))
+    print('Rotation matrix standard deviation:\n{}\n\n'.format(rot_dev))
+    print('Average translation matrix:\n{}\n\n'.format(avrg_trans))
+    print('Translation matrix standard deviation:\n{}\n\n'.format(trans_dev))
+
+    print('|t| =', np.linalg.norm(avrg_trans))
 
     correct_distortion(WebCam, avrg_mtx, avrg_dist)
