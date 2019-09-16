@@ -3,7 +3,7 @@
 
 ## Projeto
 
-Projeto para introdução à visão computacional, visando o uso da biblioteca OpenCV para conceitos básicos do tema.
+Projeto para Princípios de Visão Computacional, visando o uso da biblioteca OpenCV para calibração de câmeras e obtenção de medidas reais a partir de parâmetros de calibração.
 
 ## Licensa
 
@@ -16,27 +16,39 @@ Estas instruções vão mostrar os requisitos básicos para utilização do prog
 ### Pré-requisitos
 
 * Python3 (elaborado em versão 3.7.4. Não testado para versões inferiores)
-* OpenCV (versão 3.4 ou superior)
-* Tkinter (elaborado em versão 8.6. Não testado para versões inferiores)
+* OpenCV (versão 3.2 ou superior)
 * NumPy (elaborado em versão 1.17.0. Não testado para versões inferiores)
+* Submódulo xml.etree.ElementTree
+* Pandas (elaborado em versão 0.25.1. Não testado para versões inferiores)
+* Função `time()` do módulo time
+* Funções `remove()` e `exists()` do módulo os e submódulo os.path
+* Tipo `datetime` do módulo datetime
 
 ## Usando o programa
 
 O programa pode ser utilizado a partir do comando:
 ```
-python3 LearnOpenCV.py
+python3 CameraCalibration.py
 ```
 
-em seguida, seguir as janelas de escolha de tipo de uso (arquivos de imagem ou vídeo ou webcam, coloridos ou em tom de cinza).
-Ao escolher um arquivo ou abrir a webcam, basta clicar em um ponto da imagem para selecionar um pixel ou apertar a tecla <kbd>Q</kbd> para sair
+em seguida, mostrar o padrão de calibração xadrez para realizar o processo de calibração.  
+A cada 5 imagens, as janelas "raw" e "undistorted" vão aparecer.  
+Pressione a tecla <kbd>Q</kbd> para repetir a calibração, <kbd>R</kbd> para salvar a imagem da janela "raw" e <kbd>U</kbd> para salvar a da janela "undistorted".  
+Após 5 repetições, serão gerados os arquivos .xml e será feita uma média e um desvio padrão de cada um, mostrando as janelas "raw" e "undistorted" finais.  
+Por fim, clique em qualquer uma das duas janelas para realizar medidas em pixels e em mm - medidas em mm só ocorrem após a calibração com a média dos arquivos .xml.
+
 
 ## Feito com
 
-* [Python3](https://www.python.org/)
-* [OpenCV](https://opencv.org/)
-* [Tkinter](https://docs.python.org/3/library/tk.html)
-* [NumPy](https://numpy.org/)
+* [Python3](https://www.python.org/ "Python documentation")
+    * [Módulo OS](https://docs.python.org/3/library/os.html "OS module documentation")
+    * [Módulo XML](https://docs.python.org/3/library/xml.html "XML module documentation")
+    * [Datetime](https://docs.python.org/3/library/datetime.html "Datetime module documentation")
+* [OpenCV](https://opencv.org/ "OpenCV documentation")
+* [NumPy](https://numpy.org/ "NumPy documentation")
+* [Pandas](https://pandas.pydata.org/pandas-docs/stable/ "Pandas documentation")
 
 ## Desenvolvedor
 
-* Leonardo Alves - [GitHub](https://github.com/LTxAlves)
+* Leonardo Alves - [GitHub](https://github.com/LTxAlves "GitHub de Leonardo Alves")
+* Rosana Ribeiro
