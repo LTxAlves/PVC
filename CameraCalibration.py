@@ -9,15 +9,18 @@ import xml.etree.ElementTree as ET
 
 IMAGE_SIZE = (640, 360)
 
-def PixelsToReal(x1, y1, x2, y2):
+def PixelsToReal(u, v):
     inv_intrinsics = np.linalg.inv(avrg_mtx)
     inv_extrinsics = np.linalg.pinv(np.concatenate([avrg_rot, avrg_trans], axis=1))
-    point1, point2 = np.array([x1, x2, 1]), np.array([x2, y2, 1])
-    mapping1 = np.matmul(inv_extrinsics, np.matmul(inv_intrinsics, point1))
-    mapping1 /= mapping1[-1]
-    mapping2 = np.matmul(inv_extrinsics, np.matmul(inv_intrinsics, point2))
-    mapping2 /= mapping2[-1]
-    return np.sqrt((mapping2[0]-mapping1[0])**2 + (mapping2[1] - mapping1[1])**2) # assuming z2 = z1 = 0, distance = ((x2-x1)^2 + (y2-y1)^2)^0.5
+    point = np.array((u, v, 1))
+    remap = np.matmul(inv_intrinsics, point)
+    remap = np.matmul(inv_extrinsics, remap)
+    return remap / remap[-1]
+
+def DistanceCalc(coord1, coord2):
+    distance = coord1 - coord2
+    distance = np.sqrt(distance[0]**2 + distance[1]**2 + distance[3]**2)
+    return distance
 
 def ClickEvent(event, x, y, flags, param): #callback event for mouse events
     if event == cv2.EVENT_LBUTTONDOWN: #left click on image/video
@@ -28,7 +31,9 @@ def ClickEvent(event, x, y, flags, param): #callback event for mouse events
             print('Line length = %.5f'%(size), 'pixels')
 
             if finished:
-                distance = PixelsToReal(param[0][0], param[0][1], param[1][0], param[0][1])
+                coord1 = PixelsToReal(param[0][0], param[0][1])
+                coord2 = PixelsToReal(param[1][0], param[1][1])
+                distance = DistanceCalc(coord1, coord2)
                 print('Real distance = %.5f'%(distance))
 
         if len(param) == 3: # every third click counts as a 1st click
@@ -86,6 +91,12 @@ def avg_mtx(filename=None, src='cal'):
     avg = np.average(data, axis=0)
     std_dev = np.std(data, axis=0, ddof=1)
 
+    if src == 'trans':
+        norms = np.linalg.norm(data, axis=1)
+        norm_std = np.std(norms, axis=0)
+        norms = norms.mean()
+        return avg, std_dev, norms, norm_std
+
     return avg, std_dev
 
 rawClicks = [] #coordinates of clicks on raw image
@@ -117,7 +128,7 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
         -tvecs: 1x3 translational vector (average between max_images snapshots)
     '''
     # stop criteria
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, square_size, 0.001)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
     objp = np.zeros((board_h*board_w,3), dtype='float32')
@@ -308,7 +319,7 @@ if __name__ == "__main__":
     avrg_mtx, std_dev = avg_mtx('calibrationMatrix.xml')
     avrg_dist, dist_dev = avg_mtx('distortionMatrix.xml', src='dist')
     avrg_rot, rot_dev = avg_mtx('rotationMatrix.xml', src='rot')
-    avrg_trans, trans_dev = avg_mtx('translationMatrix.xml', src='trans')
+    avrg_trans, trans_dev, avrg_norm, norm_std = avg_mtx('translationMatrix.xml', src='trans')
 
     avrg_trans = avrg_trans.reshape((3, 1))
     trans_dev = trans_dev.reshape((3, 1))
@@ -322,6 +333,6 @@ if __name__ == "__main__":
     print('Average translation matrix:\n{}\n\n'.format(avrg_trans))
     print('Translation matrix standard deviation:\n{}\n\n'.format(trans_dev))
 
-    print('|t| =', np.linalg.norm(avrg_trans))
+    print('|t| =', np.linalg.norm(avrg_trans), '+/-', norm_std)
 
     correct_distortion(WebCam, avrg_mtx, avrg_dist)
