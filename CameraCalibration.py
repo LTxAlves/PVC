@@ -136,6 +136,8 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
     # counter for number of detected images
     detected_images = 0
 
+    corners_img = None
+
     while detected_images != max_images:
         # saves time elapsed since last chessboard image capture (time_step condition)
         elapsed = time() - start_time
@@ -163,13 +165,8 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
             imgpoints.append(corners2)
 
             # shows user chessboard corners found
-            img = cv2.drawChessboardCorners(img, (board_w,board_h), corners2, ret)
+            corners_img = cv2.drawChessboardCorners(img, (board_w,board_h), corners2, ret)
             cv2.imshow('Corners Detected',img)
-
-
-            k = cv2.waitKey(1) & 0xFF
-            if k == ord('s'):
-                cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', img)
 
             # resests star_time after finding pattern (time_step condition)
             start_time = time()
@@ -178,6 +175,8 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
             break
+        elif k == ord('s') and corners_img is not None:
+            cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', corners_img)
 
     # destroy windows used in caliibration
     cv2.destroyAllWindows()
