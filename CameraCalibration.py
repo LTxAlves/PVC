@@ -10,16 +10,16 @@ import xml.etree.ElementTree as ET
 IMAGE_SIZE = (640, 360)
 
 def PixelsToReal(u, v):
-    inv_intrinsics = np.linalg.inv(avrg_mtx)
-    inv_extrinsics = np.linalg.pinv(np.concatenate([avrg_rot, avrg_trans], axis=1))
-    point = np.array((u, v, 1))
+    inv_intrinsics = np.linalg.inv(avrg_mtx) # A^{-1}
+    inv_extrinsics = np.linalg.pinv(np.concatenate([avrg_rot, avrg_trans], axis=1)) # E^{-1}
+    point = np.array((u, v, 1)) # P = (u, v, 1)
     remap = np.matmul(inv_intrinsics, point)
-    remap = np.matmul(inv_extrinsics, remap)
-    return remap / remap[-1]
+    remap = np.matmul(inv_extrinsics, remap) # remapped point = E^{-1} * A^{-1} * P
+    return remap / remap[-1] # normalizes so that remap = (X, Y, Z, 1)
 
 def DistanceCalc(coord1, coord2):
-    distance = coord1 - coord2
-    distance = np.sqrt(distance[0]**2 + distance[1]**2 + distance[3]**2)
+    distance = coord1 - coord2 # vector from coord2 to coord1
+    distance = np.sqrt(distance[0]**2 + distance[1]**2 + distance[3]**2) #norm of vector for distance
     return distance
 
 def ClickEvent(event, x, y, flags, param): #callback event for mouse events
@@ -27,14 +27,14 @@ def ClickEvent(event, x, y, flags, param): #callback event for mouse events
 
         param.append((x, y)) # appends coordinates to array
         if len(param) == 2: #calculates distance of 2 pairs of coordinates on array
-            size = np.sqrt((param[0][0] - param[1][0])**2 + (param[0][1] - param[1][1])**2)
+            size = np.sqrt((param[0][0] - param[1][0])**2 + (param[0][1] - param[1][1])**2) #size of line in pixels
             print('Line length = %.5f'%(size), 'pixels')
 
             if finished:
                 coord1 = PixelsToReal(param[0][0], param[0][1])
                 coord2 = PixelsToReal(param[1][0], param[1][1])
                 distance = DistanceCalc(coord1, coord2)
-                print('Real distance = %.5f'%(distance))
+                print('Real distance = %.5f'%(distance), 'mm')
 
         if len(param) == 3: # every third click counts as a 1st click
             param.clear()
@@ -49,49 +49,49 @@ From a Pandas dataframe, creats fields from each line in it and saves them as a 
 
 def to_xml(df, filename=None, mode='a+'):
     if exists(filename) and iterator == 0: #removes old files when restarting program
-            remove(filename)
+        remove(filename)
 
     if iterator == 0:
-        res = '<calibration>\n\t<matrix>\n'
+        res = '<calibration>\n\t<matrix>\n' # <root> and first <matrix>
     else:
-        res = '\t<matrix>\n'
+        res = '\t<matrix>\n' # other <matrix>
 
     def row_to_xml(row):
-        xml = ['\t\t<row>']
-        for i, col_name in enumerate(row.index):
-            xml.append('\t\t\t<value name=\"{0}\">{1}</value>'.format(col_name, row.iloc[i]))
-        xml.append('\t\t</row>\n')
-        return '\n'.join(xml)
-    res += '\n'.join(df.apply(row_to_xml, axis=1))
+        xml = ['\t\t<row>'] # <row> in <matrix>
+        for i, col_name in enumerate(row.index): # iterates through dataframe
+            xml.append('\t\t\t<value name=\"{0}\">{1}</value>'.format(col_name, row.iloc[i])) # fills values
+        xml.append('\t\t</row>\n') # closes each <row>
+        return '\n'.join(xml) # puts newline between each row and value
+    res += '\n'.join(df.apply(row_to_xml, axis=1)) # puts newlines between each matrix
 
-    res += '\t</matrix>\n'
+    res += '\t</matrix>\n' # closes each <matrix>
 
     if iterator == repeats - 1:
-        res += '</calibration>'
+        res += '</calibration>'# closes <root>
 
     if filename is None:
         return res
     with open(filename, mode) as f:
-        f.write(res)
+        f.write(res) # saves file
 
 def avg_mtx(filename=None, src='cal'):
-    root = ET.parse(filename).getroot()
-    data = []
-    for val in root.iter('value'):
+    root = ET.parse(filename).getroot() # element tree from xml file
+    data = [] # empty array for data
+    for val in root.iter('value'): # puts data in array
         data.append(float(val.text))
 
-    data = np.array(data)
-    if src == 'cal' or src == 'rot':
+    data = np.array(data) # converts array no numpy ndarray
+    if src == 'cal' or src == 'rot': # calibration and rotation matrices (they have same shape)
         data = np.reshape(data, (repeats, 3, 3))
-    elif src == 'dist':
+    elif src == 'dist': # distortion matrix
         data = np.reshape(data, (repeats, 5))
-    elif src == 'trans':
+    elif src == 'trans': # translation matrix
         data = np.reshape(data, (repeats, 3))
 
-    avg = np.average(data, axis=0)
-    std_dev = np.std(data, axis=0, ddof=1)
+    avg = np.average(data, axis=0) # averages over each matrix
+    std_dev = np.std(data, axis=0, ddof=1) # gets standar deviation
 
-    if src == 'trans':
+    if src == 'trans': # makesit easier to get norm and its standard deviation
         norms = np.linalg.norm(data, axis=1)
         norm_std = np.std(norms, axis=0)
         norms = norms.mean()
@@ -147,6 +147,7 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
     # counter for number of detected images
     detected_images = 0
 
+    # image with chess corners found
     corners_img = None
 
     while detected_images != max_images:
@@ -186,7 +187,7 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
             break
-        elif k == ord('s') and corners_img is not None:
+        elif k == ord('s') and corners_img is not None: # saves image with corners on 's' press
             cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', corners_img)
 
     # destroy windows used in caliibration
@@ -198,19 +199,20 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
     rvecs = np.array(rvecs)
     rmtx = np.zeros((3,3))
 
-    for vector in rvecs:
+    for vector in rvecs: # reverses the rodrigues() tranform in each rotation matrix
         aux, _ = cv2.Rodrigues(vector)
-        rmtx += aux
+        rmtx += aux # sum of rot matrices
 
-    rmtx /= max_images
+    rmtx /= max_images # averages rot matrix
     
-    tvecs = np.array(tvecs).mean(axis=0).reshape((1, 3))
+    tvecs = np.array(tvecs).mean(axis=0).reshape((1, 3)) # averages translation matrices
 
     print('Intrinsic parameters matrix:\n{}'.format(mtx))
     print('Distortion parameters:\n{}'.format(dist))
     print('Rotational matrix\n{}'.format(rmtx))
     print('Translational matrix\n{}'.format(tvecs.transpose()))
 
+    # convert matrices to dataframes to save in .xml files
     mtx_df = DataFrame({'Column1' : mtx[:, 0], 'Column2' : mtx[:, 1], 'Column3' : mtx[:, 2]})
     to_xml(mtx_df, filename='calibrationMatrix.xml')
     dist_df = DataFrame({'K1' : dist[:, 0], 'K2' : dist[:, 1], 'P1' : dist[:, 2], 'P2' : dist[:, 3], 'K3' : dist[:, 4]})
@@ -296,18 +298,19 @@ if __name__ == "__main__":
 
     # number of intersections between 4 spaces on
     # chessboard pattern (horizontally and vertically)
-    board_w = 6
-    board_h = 8
+    board_w = 8
+    board_h = 6
 
     # size of each space on chessboard pattern (mm)
     square_size = 28
 
     # time to wait for user to move chessboard between captures
-    time_step = 2
+    time_step = 1
 
     # number of calibrations for averaging the matrix
     repeats = 5
 
+    # flag for when finished (reapeats) calibrations
     finished = False
 
     for iterator in range(repeats):
@@ -316,6 +319,7 @@ if __name__ == "__main__":
     
     finished = True
 
+    # gets averages from .xml files
     avrg_mtx, std_dev = avg_mtx('calibrationMatrix.xml')
     avrg_dist, dist_dev = avg_mtx('distortionMatrix.xml', src='dist')
     avrg_rot, rot_dev = avg_mtx('rotationMatrix.xml', src='rot')
@@ -335,4 +339,5 @@ if __name__ == "__main__":
 
     print('|t| =', np.linalg.norm(avrg_trans), '+/-', norm_std)
 
+    # corrects image with averaged matrices
     correct_distortion(WebCam, avrg_mtx, avrg_dist)
