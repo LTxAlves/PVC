@@ -186,7 +186,7 @@ def calibration(WebCam, square_size, board_h, board_w, time_step, max_images):
         # press 'q' to close program
         k = cv2.waitKey(1) & 0xFF
         if k == ord('q'):
-            break
+            quit()
         elif k == ord('s') and corners_img is not None: # saves image with corners on 's' press
             cv2.imwrite('capture' + datetime.now().strftime('%Y-%m-%d-%H:%M:%S') + '.jpg', corners_img)
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     square_size = 28
 
     # time to wait for user to move chessboard between captures
-    time_step = 1
+    time_step = 3
 
     # number of calibrations for averaging the matrix
     repeats = 5
